@@ -1,0 +1,15 @@
+name: Backend Health Check
+
+on:
+  schedule:
+    - cron: '*/10 * * * *' # Runs every 10 minutes
+  workflow_dispatch:
+
+  jobs:
+    health-check:
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Ping backend
+          run: |
+            curl -f https://url-shortener-server-cv17.onrender.com/health || exit 1
