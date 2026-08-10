@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+/// A single shortened link. No account system — this service is
+/// standalone (own database, no FK into any other NestSMS service).
+/// Ownership of a link (for viewing its analytics) is proven by
+/// possessing `statsTokenHash`'s pre-image, handed out once at creation.
+model ShortUrl {
+  id             String         @id
+  shortCode      String         @unique @db.VarChar(64)
+  originalUrl    String         @db.VarChar(2048)
+  isCustomAlias  Boolean        @default(false)
+  status         ShortUrlStatus @default(ACTIVE)
+  /// Null = never expires. Checked lazily at redirect time.
+  expiresAt      DateTime?
+  clickCount     Int            @default(0)
+  lastClickedAt  DateTime?
+  createdByIp    String?        @db.VarChar(64)
+  /// sha256 of the stats token — the raw token is shown once at creation
+  /// and never stored, same pattern as an API key.
+  statsTokenHash String         @unique @db.VarChar(64)
+  /// The anonymous requester that created this link (see Requester below).
+  /// Nullable: rows created before this feature existed have none.
+  requesterId    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  Requester Requester?      @relation(fields: [requesterId], references: [id], onDelete: SetNull)
+  clicks    ShortUrlClick[]
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([requesterId])
+}
+
+/// A no-login, cookie-identified requester. The cookie the browser holds is
+/// a random opaque token; only its sha256 is stored here (`tokenHash`) — the
+/// same "never store the raw secret" pattern as ShortUrl.statsTokenHash.
+/// This is identity for authorization purposes only (recognizing "the same
+/// requester came back", scoping "my data"), not an account: no email,
+/// password, or recovery mechanism.
+model Requester {
+  id         String   @id
+  tokenHash  String   @unique @db.VarChar(64)
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  shortUrls ShortUrl[]
+}
+
+/// One row per redirect — the detailed log behind the stats-token-gated
+/// analytics endpoint. Click *counts* on ShortUrl stay public; this table
+/// (IP, device, location per visitor) does not.
+model ShortUrlClick {
+  id          String   @id
+  shortUrlId  String
+  ipAddress   String?  @db.VarChar(64)
+  userAgent   String?  @db.VarChar(512)
+  device      String?  @db.VarChar(64)
+  browser     String?  @db.VarChar(64)
+  os          String?  @db.VarChar(64)
+  referrer    String?  @db.VarChar(512)
+  country     String?  @db.VarChar(128)
+  countryCode String?  @db.VarChar(8)
+  /// sha256(ip + userAgent) — the "same visitor" key used to count unique clicks.
+  fingerprint String   @db.VarChar(64)
+  clickedAt   DateTime @default(now())
+
+  ShortUrl ShortUrl @relation(fields: [shortUrlId], references: [id], onDelete: Cascade)
+
+  @@index([shortUrlId])
+  @@index([shortUrlId, fingerprint])
+  @@index([clickedAt])
+}
+
+enum ShortUrlStatus {
+  ACTIVE
+  DISABLED
+  EXPIRED
+}

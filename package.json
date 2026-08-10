@@ -1,0 +1,42 @@
+{
+  "name": "nest-sms-url-server",
+  "version": "1.0.0",
+  "description": "NestSMS URL Shortener API",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "tsx watch server.ts",
+    "build": "tsc && prisma generate",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.1.2",
+    "prisma": "^7.9.1",
+    "tsx": "^4.23.5",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@prisma/adapter-mariadb": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "axios": "^1.19.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.3.0",
+    "nanoid": "^5.1.6",
+    "ua-parser-js": "^2.0.10",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "zod": "^4.4.3"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.9.1": true,
+    "esbuild@0.28.2": true,
+    "prisma@7.9.1": true
+  }
+}
