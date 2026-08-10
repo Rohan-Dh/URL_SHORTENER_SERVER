@@ -15,6 +15,8 @@ const adapter = new PrismaMariaDb({
   password: config.database.password,
   database: config.database.name,
   connectionLimit: config.database.connectionLimit,
+  ssl: config.database.ssl ? { rejectUnauthorized: config.database.sslRejectUnauthorized } : undefined,
+  connectTimeout: config.database.connectTimeoutMs,
 });
 
 export const prisma =
