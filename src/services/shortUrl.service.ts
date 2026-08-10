@@ -1,4 +1,5 @@
 import { UAParser } from 'ua-parser-js';
+import { Prisma } from '@prisma/client';
 import shortUrlRepository, { ShortUrlStatus } from '../repository/shortUrl.repository.js';
 import { filterUrlSubmission, logContentFilterDecision } from '../lib/contentFilter.js';
 import { generateShortCode, isValidAlias, RESERVED_CODES } from '../utils/shortCode.js';
@@ -20,6 +21,28 @@ const MAX_CODE_GENERATION_ATTEMPTS = 5;
 
 function toShortUrl(shortCode: string): string {
   return `${config.app.url}/${shortCode}`;
+}
+
+/**
+ * True for a database unique-constraint violation on `shortCode` specifically
+ * (Prisma error P2002). This is the race-condition backstop: the app-level
+ * `isShortCodeTaken` check and this insert aren't atomic, so two requests for
+ * the same brand-new alias can both pass the check before either commits.
+ * The database catches what the check couldn't; this just recognizes that
+ * failure and reports it the same way as the normal case.
+ *
+ * `@prisma/adapter-mariadb` doesn't populate the classic `meta.target` field
+ * P2002 has on the engine-based client — its column info lives at
+ * `meta.driverAdapterError.cause.constraint.index`, an adapter-internal shape
+ * not worth depending on directly. `err.message` (e.g. "Unique constraint
+ * failed on the constraint: `ShortUrl_shortCode_key`") is the stable,
+ * public-facing field, so that's what's checked here, scoped to the
+ * ShortUrl model via `meta.modelName` to rule out unrelated P2002s.
+ */
+function isDuplicateShortCodeError(err: unknown): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return false;
+  const meta = err.meta as { modelName?: string } | undefined;
+  return meta?.modelName === 'ShortUrl' && err.message.includes('shortCode');
 }
 
 /** True when `url` points back at this shortener's own host — no shortening a shortener of itself. */
@@ -73,16 +96,25 @@ class ShortUrlService {
     const expiresAt = expiresInDays
       ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
       : undefined;
-    const record = await shortUrlRepository.create({
-      id: crypto.randomUUID(),
-      shortCode,
-      originalUrl: url,
-      isCustomAlias,
-      statsTokenHash: hashToken(statsToken),
-      requesterId,
-      expiresAt,
-      createdByIp: ip,
-    });
+
+    let record;
+    try {
+      record = await shortUrlRepository.create({
+        id: crypto.randomUUID(),
+        shortCode,
+        originalUrl: url,
+        isCustomAlias,
+        statsTokenHash: hashToken(statsToken),
+        requesterId,
+        expiresAt,
+        createdByIp: ip,
+      });
+    } catch (err) {
+      if (isCustomAlias && isDuplicateShortCodeError(err)) {
+        return { ok: false, reason: 'ALIAS_TAKEN' };
+      }
+      throw err;
+    }
 
     return {
       ok: true,
