@@ -16,13 +16,14 @@ export const createShortUrlSchema = z.object({
     .min(1, 'URL is required')
     .max(2048, 'URL is too long')
     .refine(isHttpUrl, 'Must be a valid http(s) URL'),
-  alias: z
-    .string()
-    .trim()
-    .min(3, 'Alias must be at least 3 characters')
-    .max(30, 'Alias must be at most 30 characters')
-    .regex(/^[a-zA-Z0-9-]+$/, 'Alias may only contain letters, numbers and hyphens')
-    .optional(),
+  // Custom aliases are temporarily disabled — uncomment to re-enable.
+  // alias: z
+  //   .string()
+  //   .trim()
+  //   .min(3, 'Alias must be at least 3 characters')
+  //   .max(30, 'Alias must be at most 30 characters')
+  //   .regex(/^[a-zA-Z0-9-]+$/, 'Alias may only contain letters, numbers and hyphens')
+  //   .optional(),
   // How many days the link stays valid for. Omitted/undefined = never expires.
   expiresInDays: z
     .number()

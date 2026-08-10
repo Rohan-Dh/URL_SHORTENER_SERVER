@@ -29,7 +29,8 @@ class ShortUrlController extends BaseController {
       const identifier = req.ip ?? 'unknown';
       const result = await shortUrlService.createShortUrl({
         url: parsed.data.url,
-        alias: parsed.data.alias,
+        // Custom aliases are temporarily disabled — see shortUrl.schema.ts.
+        // alias: parsed.data.alias,
         expiresInDays: parsed.data.expiresInDays,
         requesterId: req.requester.id,
         identifier,
